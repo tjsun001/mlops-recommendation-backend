@@ -8,5 +8,12 @@
     build:
       runs-on: ubuntu-latest
       steps:
-        - name: Test
-          run: echo "thurman code"
+        - name: Checkout
+          uses: actions/checkout@v4
+        - name: Configure JDK
+          uses: actions/setup-java@v4
+          with:
+            distribution: 'temurin'
+            java-version: '21'
+        - name: Maven Clean Verify
+          run: mvn clean verify
