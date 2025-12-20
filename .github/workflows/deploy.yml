@@ -35,15 +35,15 @@ jobs:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ env.DOCKER_PASSWORD }}
       - name: Build Maven artifact without tests
-        run: mvn -B -ntp clean package -DskipTests -DskipITs
-      - name: Build and push Docker image with Jib
-        run: mvn -B -ntp jib:build -Ddocker.image.tag=$BUILD_NUMBER
+        run: |
       - name : Setup SSH Agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
               ssh-private-key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
       - name: SSH_TO_EC2_and_Deploy
         run : |
+          mvn -B -ntp clean package jib:build \
+          -Dimage=${{ secrets.DOCKER_USERNAME }}/$IMAGE_NAME:$BUILD_NUMBER
           ssh -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP_ADDRESS 
           echo $BUILD_NUMBER
           echo $DOCKER_USERNAME

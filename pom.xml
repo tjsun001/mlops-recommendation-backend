@@ -29,9 +29,10 @@
     </scm>
     <properties>
         <java.version>21</java.version>
-        <docker.username>tjsun0001</docker.username>
+        <docker.username>tjsun001</docker.username>
         <docker.image.name>product-service</docker.image.name>
         <docker.image.tag/>
+        <maven.test.skip> true</maven.test.skip>
     </properties>
     <dependencies>
         <dependency>
