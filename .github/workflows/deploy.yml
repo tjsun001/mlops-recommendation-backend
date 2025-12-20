@@ -43,9 +43,12 @@ jobs:
       - name: SSH_TO_EC2_and_Deploy
         run : |
           ssh -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP_ADDRESS 
-          echo "start here"
-            ls -la
+            ls
             pwd
-            cd ~
-            ls -la
-          echo "end here"
+            sed -i 's|image: '"$DOCKER_USERNAME"'/'"$DOCKER_IMAGE_NAME"':.*$|image: '"$DOCKER_USERNAME"'/'"$DOCKER_IMAGE_NAME"':'"$BUILD_NUMBER"'|' docker-compose.yml
+            docker-compose  pull
+            docker-compose  up -d '$DOCKER_COMPOSE_APP_SERVICE_NAME"'
+            docker image prune -f
+            docker ps
+            echo "BUILD_NUMBER" > build-number.txt
+          EOF
