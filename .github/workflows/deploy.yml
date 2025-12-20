@@ -57,7 +57,7 @@ jobs:
             echo $APP_IMAGE
             cd /home/ubuntu/
             cd /home/ubuntu 
-            git clone https://github.com/yourusername/yourrepo.git my-app
+            git clone https://github.com/tjsun0001/product-service.git my-app
             cd my-app
             ls
             docker compose  pull
