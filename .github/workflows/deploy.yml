@@ -45,7 +45,7 @@ jobs:
         run : |
           mvn -B -ntp clean package jib:build \
           -Dimage=tjsun0001/product-service:latest
-          ssh -o StrictHostKeyChecking=no ubuntu@44.206.28.191 << 'EOF'
+          ssh -o StrictHostKeyChecking=no ubuntu@44.206.28.191 << EOF
           echo "Inside EC2"
           cd /home/ubuntu
           echo $BUILD_NUMBER
