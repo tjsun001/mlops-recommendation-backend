@@ -45,7 +45,7 @@ jobs:
         run : |
           mvn -B -ntp clean package jib:build \
           -Dimage=${DOCKER_USERNAME}/${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}
-          ssh -o StrictHostKeyChecking=no ubuntu@44.206.28.191 << EOF
+          ssh -o StrictHostKeyChecking=no $EC2_PUBLIC_IP_ADDRESS << EOF
           echo "Inside EC2"
           cd /home/ubuntu
           echo $BUILD_NUMBER
