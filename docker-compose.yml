@@ -1,6 +1,9 @@
 services:
+  app:
+    image: ${APP_IMAGE}
   product-service:
       container_name: product
+
 #      image: amigoscode/product-service:jibMaven
       build:
         context: .
