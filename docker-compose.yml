@@ -4,7 +4,7 @@ services:
   product-service:
       container_name: product
 
-#      image: tjsun0001/product-service:jibMaven
+      image: tjsun0001/product-service:latest
       build:
         context: .
         dockerfile: Dockerfile
