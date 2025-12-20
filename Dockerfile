@@ -9,7 +9,7 @@ COPY src ./src
 RUN mvn clean package
 
 # Stage 2: Run the application
-FROM openjdk:${JAVA_VERSION}-jdk-slim
+FROM eclipse-temurin:21-jdk-jammy
 WORKDIR /app
 COPY --from=builder /app/target/product-service.jar app.jar
 EXPOSE 8080
