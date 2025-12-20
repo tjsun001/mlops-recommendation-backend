@@ -15,6 +15,7 @@ jobs:
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       DOCKER_IMAGE_NAME: product-service
       DB_HOST: jdbc:postgresql
+      DB_PORT: 5432
       DOCKER_COMPOSE_APP_SERVICE_NAME: product-service
       EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
       EC2_PUBLIC_IP_ADDRESS: ${{ secrets.EC2_PUBLIC_IP_ADDRESS }}
