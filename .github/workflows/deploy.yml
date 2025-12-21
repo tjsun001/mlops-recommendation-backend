@@ -39,8 +39,8 @@ jobs:
           java-version: '21'
       - name: Generate Build Number
         run: |
-          if [ -n "${{ github.event.inputs.build_number}}"]; then
-            BUILD_NUMBER = ${{github.event.inputs.build_number}}
+          if [ -n "${{ github.event.inputs.build_number}}" ]; then
+            BUILD_NUMBER=${{github.event.inputs.build_number}}
             echo "using provided build number: $BUILD_NUMBER"
           else
             BUILD_NUMBER=$(date +'%d%m%Y%H%M%S')
