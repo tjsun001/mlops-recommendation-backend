@@ -85,7 +85,7 @@ jobs:
             export DB_USER=$DB_USER
             export DB_PASSWORD=$DB_PASSWORD
             sudo docker compose  pull
-            sudo docker compose  up -d 
+            sudo  -E docker compose  up -d 
             sudo docker image prune -f
             sudo docker ps
             echo "BUILD_NUMBER" > build-number.txt
