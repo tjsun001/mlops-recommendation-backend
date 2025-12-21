@@ -57,7 +57,7 @@ jobs:
         run: |
           IMAGE_NAME="${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:$BUILD_NUMBER"
           echo "checking if $IMAGE_NAME exists"
-          if ! docker manifest inspect "$IMAGE_NAME" > /dev/null 2>&1; then
+          if !docker manifest inspect "$IMAGE_NAME" > /dev/null 2>&1; then
             echo "provided image $IMAGE_NAME does not exist. exiting ..."
             exit 1
           fi
