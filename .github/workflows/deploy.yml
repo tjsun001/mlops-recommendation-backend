@@ -99,7 +99,7 @@ jobs:
       - name: Send Slack message with status
         if: always()
         run: >
-          "curl -X POST -H 'Content-type: application/json'
+          curl -X POST -H 'Content-type: application/json'
           --data '{"text":"Job status ${{job.status}}"}'
             ${{env.SLACK_WEBHOOK_URL}}
 
