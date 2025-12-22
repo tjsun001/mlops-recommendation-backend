@@ -100,7 +100,7 @@ jobs:
         if: always()
         run: >
           curl -X POST -H 'Content-type: application/json'
-          --data '{"text":"Job status ${{job.status}}"}'
-            ${{env.SLACK_WEBHOOK_URL}}
+          --data '{"text":"Job status ${{job.status}}"}' - https://${{ github.repository}}/commit/${{github.sha }}"}' 
+          ${{env.SLACK_WEBHOOK_URL}}
 
 
