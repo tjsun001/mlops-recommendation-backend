@@ -32,10 +32,10 @@ jobs:
       - name: Checkout
         if: ${{github.event.inputs.build_number == '' }}
         uses: actions/checkout@v4
-      - name: Send Slack message with gitub commit url
+      - name: Send Slack message with github commit url
         run: >
-          "curl -X POST -H 'Content-type: application/json'
-          --data '{"text":"${{github.event.head_commit.message}} - https://${{ github.repository}}/commit/${{github.sha }}"}' 
+          curl -X POST -H 'Content-type: application/json'
+          --data '{"text":"${{github.event.head_commit.message }} - https://${{ github.repository}}/commit/${{github.sha }}"}' 
           ${{env.SLACK_WEBHOOK_URL}}
       - name: JDK
         if: ${{ github.event.inputs.build.number == ''}}
@@ -97,6 +97,7 @@ jobs:
             echo "BUILD_NUMBER" > build-number.txt
           EOF
       - name: Send Slack message with status
+        if: always()
         run: >
           "curl -X POST -H 'Content-type: application/json'
           --data '{"text":"Job status ${{job.status}}"}'
