@@ -12,8 +12,11 @@ public class InferenceClient {
 
     private final RestClient restClient;
 
-    public InferenceClient(@Value("${inference.base-url}") String baseUrl) {
-        this.restClient = RestClient.builder()
+    public InferenceClient(
+            RestClient.Builder builder,
+            @Value("${inference.base-url}") String baseUrl
+    ) {
+        this.restClient = builder
                 .baseUrl(baseUrl)
                 .build();
     }
@@ -26,12 +29,11 @@ public class InferenceClient {
                 .retrieve()
                 .body(Object.class);
     }
+
     public Object health() {
         return restClient.get()
                 .uri("/health")
                 .retrieve()
                 .body(Object.class);
     }
-
 }
-
