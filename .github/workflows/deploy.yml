@@ -103,9 +103,8 @@ jobs:
       lsblk
       df -h /
       docker system df
-    EOF
-
-
+      EOF
+      
       - name: Send Slack message with status
         if: always()
         run: >
