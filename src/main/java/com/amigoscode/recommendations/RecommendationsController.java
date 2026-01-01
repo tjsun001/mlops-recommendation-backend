@@ -17,9 +17,8 @@ public class RecommendationsController {
         this.inferenceBaseUrl = inferenceBaseUrl;
     }
 
-    @GetMapping("/recommendations/{id}")
-    public ResponseEntity<String> recommendations(@PathVariable("id") long id) {
-        // Inference expects {"user_id": ...}
+    @GetMapping(value = "/recommendations/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Object> recommendations(@PathVariable long id) {
         Map<String, Object> payload = Map.of("user_id", id);
 
         HttpHeaders headers = new HttpHeaders();
@@ -27,13 +26,14 @@ public class RecommendationsController {
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
 
-        ResponseEntity<String> resp = restTemplate.exchange(
+        ResponseEntity<Object> resp = restTemplate.exchange(
                 inferenceBaseUrl + "/predict",
                 HttpMethod.POST,
                 entity,
-                String.class
+                Object.class
         );
 
         return ResponseEntity.status(resp.getStatusCode()).body(resp.getBody());
     }
+
 }
