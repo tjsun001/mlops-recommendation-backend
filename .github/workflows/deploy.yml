@@ -79,8 +79,8 @@ jobs:
           ssh-private-key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           
       - name: SSH_TO_EC2_and_Deploy
-  run: |
-    ssh -o StrictHostKeyChecking=no $EC2_PUBLIC_IP_ADDRESS \
+    run: |
+      ssh -o StrictHostKeyChecking=no $EC2_PUBLIC_IP_ADDRESS \
       DOCKER_USERNAME="${DOCKER_USERNAME}" BUILD_NUMBER="${BUILD_NUMBER}" 'bash -s' << 'EOF'
       set -euo pipefail
       cd /home/ubuntu/my-mlops-demo
