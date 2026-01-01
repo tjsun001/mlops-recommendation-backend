@@ -79,29 +79,32 @@ jobs:
           ssh-private-key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           
       - name: SSH_TO_EC2_and_Deploy
-        run: |
-          ssh -o StrictHostKeyChecking=no $EC2_PUBLIC_IP_ADDRESS << EOF
-          set -euo pipefail
-          cd /home/ubuntu/my-mlops-demo
-    
-          echo "${BUILD_NUMBER}" > build-number.txt
-    
-          DOCKER_USERNAME="${DOCKER_USERNAME}" BUILD_NUMBER="${BUILD_NUMBER}" docker compose config | sed -n '/product-service:/,/^[^ ]/p'
-    
-          DOCKER_USERNAME="${DOCKER_USERNAME}" BUILD_NUMBER="${BUILD_NUMBER}" docker compose pull product-service
-          DOCKER_USERNAME="${DOCKER_USERNAME}" BUILD_NUMBER="${BUILD_NUMBER}" docker compose rm -sf product-service
-          DOCKER_USERNAME="${DOCKER_USERNAME}" BUILD_NUMBER="${BUILD_NUMBER}" docker compose up -d --no-deps product-service
-    
-          docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
-    
-          # cleanup (demo-friendly)
-          docker system prune -af
-    
-          # disk visibility
-          lsblk
-          df -h /
-          docker system df
-          EOF
+  run: |
+    ssh -o StrictHostKeyChecking=no $EC2_PUBLIC_IP_ADDRESS \
+      DOCKER_USERNAME="${DOCKER_USERNAME}" BUILD_NUMBER="${BUILD_NUMBER}" 'bash -s' << 'EOF'
+      set -euo pipefail
+      cd /home/ubuntu/my-mlops-demo
+
+      echo "${BUILD_NUMBER}" > build-number.txt
+
+      docker compose config | sed -n '/product-service:/,/^[^ ]/p'
+
+      docker compose pull product-service
+      docker compose rm -sf product-service
+      docker compose up -d --no-deps --force-recreate product-service
+
+      docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+
+      # cleanup (demo-friendly)
+      docker image prune -af --filter "until=24h"
+      docker builder prune -af --filter "until=24h"
+
+      # disk visibility
+      lsblk
+      df -h /
+      docker system df
+    EOF
+
 
       - name: Send Slack message with status
         if: always()
