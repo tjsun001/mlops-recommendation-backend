@@ -26,12 +26,13 @@ jobs:
 
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-      # App defaults (you can move these to GitHub secrets if you prefer)
+      # App defaults (move to GitHub secrets if you prefer)
       POSTGRES_USER: amigoscode
       POSTGRES_PASSWORD: password
       POSTGRES_DB: jfs
       AWS_REGION: us-east-1
       MODEL_HOST_PATH: /home/ubuntu/my-mlops-demo/models/model.pkl
+
       PRODUCT_HOST_PORT: "5050"
       POSTGRES_HOST_PORT: "5333"
 
@@ -46,19 +47,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Show repo files (debug)
+        run: |
+          ls -lah
+          ls -lah .github/workflows || true
+
       - name: Choose deploy tag
         id: tags
+        shell: bash
         run: |
-          # Default: immutable sha tag for this commit
+          set -euo pipefail
+
           SHA_TAG="sha-${GITHUB_SHA}"
-          # Optional moving tag for main
           if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
             MOVING_TAG="prod"
           else
             MOVING_TAG=""
           fi
 
-          # If user provided a tag manually, deploy that.
           if [ -n "${{ github.event.inputs.image_tag }}" ]; then
             DEPLOY_TAG="${{ github.event.inputs.image_tag }}"
           else
@@ -86,7 +92,10 @@ jobs:
           java-version: "21"
 
       - name: Build & push product-service (Jib)
+        shell: bash
         run: |
+          set -euo pipefail
+
           PRODUCT_REPO="${DOCKER_USERNAME}/${DOCKER_IMAGE_NAME_PRODUCT}"
           SHA_TAG="${{ steps.tags.outputs.SHA_TAG }}"
           MOVING_TAG="${{ steps.tags.outputs.MOVING_TAG }}"
@@ -105,13 +114,16 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build & push inference-service (Dockerfile)
+        shell: bash
         run: |
+          set -euo pipefail
+
           INFER_REPO="${DOCKER_USERNAME}/${DOCKER_IMAGE_NAME_INFERENCE}"
           SHA_TAG="${{ steps.tags.outputs.SHA_TAG }}"
           MOVING_TAG="${{ steps.tags.outputs.MOVING_TAG }}"
 
-          docker build -t "${INFER_REPO}:${SHA_TAG}" -f api/Dockerfile api
-
+          # Dockerfile is at repo root; context is "."
+          docker build -t "${INFER_REPO}:${SHA_TAG}" -f Dockerfile .
           docker push "${INFER_REPO}:${SHA_TAG}"
 
           if [ -n "${MOVING_TAG}" ]; then
@@ -126,7 +138,10 @@ jobs:
           ssh-private-key: ${{ env.EC2_SSH_PRIVATE_KEY }}
 
       - name: Deploy on EC2 (compose pull + up)
+        shell: bash
         run: |
+          set -euo pipefail
+
           DEPLOY_TAG="${{ steps.tags.outputs.DEPLOY_TAG }}"
           PRODUCT_IMAGE="${DOCKER_USERNAME}/${DOCKER_IMAGE_NAME_PRODUCT}:${DEPLOY_TAG}"
           INFERENCE_IMAGE="${DOCKER_USERNAME}/${DOCKER_IMAGE_NAME_INFERENCE}:${DEPLOY_TAG}"
@@ -136,7 +151,6 @@ jobs:
 
           cd /home/ubuntu/my-mlops-demo
 
-          # Write deploy-time env (do NOT commit this file)
           cat > .env <<ENV
           PRODUCT_IMAGE=${PRODUCT_IMAGE}
           INFERENCE_IMAGE=${INFERENCE_IMAGE}
@@ -154,21 +168,23 @@ jobs:
 
           echo "${DEPLOY_TAG}" > deployed-image-tag.txt
 
-          # Pull & run (full stack)
-          docker compose -f docker-compose.yml -f docker-compose.ec2.yml pull
-          docker compose -f docker-compose.yml -f docker-compose.ec2.yml up -d --remove-orphans
+          docker compose -f docker-compose.yml -f docker-compose.ec2 pull
+          docker compose -f docker-compose.yml -f docker-compose.ec2 up -d --remove-orphans
 
           docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
           EOF
 
       # ---------- Post-deploy smoke tests ----------
       - name: Smoke test /ready + /health
+        shell: bash
         run: |
-          EC2="http://${{ env.EC2_PUBLIC_IP_ADDRESS }}:${{ env.PRODUCT_HOST_PORT }}"
+          set -euo pipefail
 
-          echo "Waiting for service to become ready..."
+          BASE="http://${{ env.EC2_PUBLIC_IP_ADDRESS }}:${{ env.PRODUCT_HOST_PORT }}"
+
+          echo "Waiting for inference to become ready via product-service..."
           for i in {1..30}; do
-            if curl -fsS "${EC2}/api/inference/ready" >/dev/null 2>&1; then
+            if curl -fsS "${BASE}/api/inference/ready" >/dev/null 2>&1; then
               echo "Inference ready ✅"
               break
             fi
@@ -176,12 +192,12 @@ jobs:
           done
 
           # Fail if not ready
-          curl -fsS "${EC2}/api/inference/ready" >/dev/null
+          curl -fsS "${BASE}/api/inference/ready" >/dev/null
 
           echo "Health output:"
-          curl -fsS "${EC2}/api/inference/health" | tee /tmp/health.json
+          curl -fsS "${BASE}/api/inference/health" | tee /tmp/health.json
 
-          # Optional: basic assertion your hash exists
+          # Assert model hash exists
           grep -q "model_sha256" /tmp/health.json
 
       - name: Slack - end
