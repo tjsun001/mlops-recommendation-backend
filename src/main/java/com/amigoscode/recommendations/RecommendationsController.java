@@ -61,7 +61,7 @@ public class RecommendationsController {
                 body.put("source", "ml");
             }
 
-            // Always include id for clarity (helps demo + debugging)
+            // Always include id for clarity (helps demo.sh + debugging)
             body.putIfAbsent("user_id", id);
 
             return ResponseEntity
