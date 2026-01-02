@@ -112,7 +112,7 @@ jobs:
 
       # ---- Slack notification (optional) ----
       - name: Slack - end
-        if: always() && secrets.SLACK_WEBHOOK_URL != ''
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
