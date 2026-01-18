@@ -1,0 +1,28 @@
+package com.thurman.inference;
+
+
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api")
+public class InferenceController {
+
+    private final InferenceClient inferenceClient;
+
+    public InferenceController(InferenceClient inferenceClient) {
+        this.inferenceClient = inferenceClient;
+    }
+
+    @GetMapping("/recommendations/{userId}")
+    public Object recommendations(@PathVariable int userId) {
+        return inferenceClient.predict(userId);
+    }
+
+    @GetMapping("/inference/health")
+    public Object inferenceHealth() {
+        return inferenceClient.health();
+    }
+}
+
+
+

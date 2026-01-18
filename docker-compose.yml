@@ -1,44 +1,7 @@
 services:
-  product-service:
-    container_name: product
-    image: ${PRODUCT_IMAGE}
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-      INFERENCE_BASE_URL: http://inference:8000
-    ports:
-      - "${PRODUCT_HOST_PORT:-5050}:8080"
-    depends_on:
-      inference:
-        condition: service_healthy
-      db:
-        condition: service_started
-    restart: unless-stopped
-    networks:
-      - amigos
-
-  inference:
-    container_name: inference
-    image: ${INFERENCE_IMAGE}
-    environment:
-      AWS_REGION: ${AWS_REGION:-us-east-1}
-      MODEL_PATH: /tmp/model.pkl
-      # Optional if you use it:
-      # MODEL_S3_URI: ${MODEL_S3_URI}
-      # MODEL_LOCAL_PATH: ${MODEL_LOCAL_PATH}
-    expose:
-      - "8000"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/ready || exit 1"]
-      interval: 10s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
-    restart: unless-stopped
-    networks:
-      - amigos
-
+  # -----------------------------
+  # Postgres (Docker)
+  # -----------------------------
   db:
     container_name: jfs-postgres
     image: postgres:15
@@ -51,6 +14,92 @@ services:
     restart: unless-stopped
     volumes:
       - db:/var/lib/postgresql/data
+    networks:
+      - amigos
+
+  # -----------------------------
+  # Kafka (Local) - Redpanda (Kafka API compatible)
+  # -----------------------------
+  kafka:
+    image: redpandadata/redpanda:latest
+    container_name: kafka
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp
+      - "1"
+      - --memory
+      - "1G"
+      - --reserve-memory
+      - "0M"
+      - --node-id
+      - "0"
+      - --check=false
+      - --kafka-addr
+      - PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr
+      - PLAINTEXT://kafka:9092
+    ports:
+      - "9092:9092"
+    restart: unless-stopped
+    networks:
+      - amigos
+
+  # -----------------------------
+  # Inference service
+  # -----------------------------
+  inference:
+    container_name: inference
+    image: ${INFERENCE_IMAGE}
+    environment:
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      MODEL_PATH: /tmp/model.pkl
+      # If you mount a local model file, keep it simple:
+      # MODEL_HOST_PATH: ${MODEL_HOST_PATH:-./models/model.pkl}
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/ready || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - amigos
+
+  # -----------------------------
+  # Product service (Spring Boot)
+  # -----------------------------
+  product-service:
+    container_name: product
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${PRODUCT_IMAGE}
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+
+      INFERENCE_BASE_URL: http://inference:8000
+
+      # Kafka bootstrap (local)
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC_INFERENCE_EVENTS: inference.events.v1
+    ports:
+      - "${PRODUCT_HOST_PORT:-5050}:8080"
+    depends_on:
+      db:
+        condition: service_started
+      kafka:
+        condition: service_started
+      # IMPORTANT: keep inference dependency OPTIONAL while we get Kafka working.
+      # If you want to require inference later, uncomment:
+      # inference:
+      #   condition: service_healthy
+    restart: unless-stopped
     networks:
       - amigos
 
