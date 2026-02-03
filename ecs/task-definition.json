@@ -1,0 +1,30 @@
+{
+  "family": "mlops-poc-dev-product-service",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "REPLACE_ME_EXECUTION_ROLE_ARN",
+  "taskRoleArn": "REPLACE_ME_TASK_ROLE_ARN",
+  "containerDefinitions": [
+    {
+      "name": "product-service",
+      "image": "REPLACE_ME_IMAGE",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 5050,
+          "protocol": "tcp"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/mlops-poc-dev-product-service",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}
