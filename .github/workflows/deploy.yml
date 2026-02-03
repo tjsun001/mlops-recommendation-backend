@@ -9,7 +9,11 @@ on:
         description: "the build number to deploy (optional)"
         required: false
         type: string
-
+        
+permissions:
+  id-token: write
+  contents: read
+  
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
