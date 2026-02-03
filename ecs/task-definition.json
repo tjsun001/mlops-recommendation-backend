@@ -4,8 +4,8 @@
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "512",
   "memory": "1024",
-  "executionRoleArn": "REPLACE_ME_EXECUTION_ROLE_ARN",
-  "taskRoleArn": "REPLACE_ME_TASK_ROLE_ARN",
+ "executionRoleArn": "arn:aws:iam::080967118593:role/mlops-poc-dev-ecs-task-exec-role",
+  "taskRoleArn": "arn:aws:iam::080967118593:role/mlops-poc-dev-ecs-task-role",
   "containerDefinitions": [
     {
       "name": "product-service",
