@@ -4,19 +4,39 @@
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "512",
   "memory": "1024",
- "executionRoleArn": "arn:aws:iam::080967118593:role/mlops-poc-dev-ecs-task-exec-role",
+  "executionRoleArn": "arn:aws:iam::080967118593:role/mlops-poc-dev-ecs-task-exec-role",
   "taskRoleArn": "arn:aws:iam::080967118593:role/mlops-poc-dev-ecs-task-role",
   "containerDefinitions": [
     {
       "name": "product-service",
       "image": "REPLACE_ME_IMAGE",
       "essential": true,
+
       "portMappings": [
         {
           "containerPort": 5050,
           "protocol": "tcp"
         }
       ],
+
+      "environment": [
+        {
+          "name": "SPRING_DATASOURCE_URL",
+          "value": "jdbc:postgresql://mlops-poc-dev-postgres.cepc6knnxbcb.us-east-1.rds.amazonaws.com:5432/jfs"
+        },
+        {
+          "name": "SPRING_DATASOURCE_USERNAME",
+          "value": "amigoscode"
+        }
+      ],
+
+      "secrets": [
+        {
+          "name": "SPRING_DATASOURCE_PASSWORD",
+          "valueFrom": "arn:aws:ssm:us-east-1:080967118593:parameter/mlops-poc/dev/product-service/db_password"
+        }
+      ],
+
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
@@ -24,7 +44,11 @@
           "awslogs-region": "us-east-1",
           "awslogs-stream-prefix": "ecs"
         }
-      }
-    }
-  ]
-}
+      },
+
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:5050/actuator/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries":
+
