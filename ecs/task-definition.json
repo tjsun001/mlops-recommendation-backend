@@ -11,14 +11,12 @@
       "name": "product-service",
       "image": "REPLACE_ME_IMAGE",
       "essential": true,
-
       "portMappings": [
         {
           "containerPort": 5050,
           "protocol": "tcp"
         }
       ],
-
       "environment": [
         {
           "name": "SPRING_DATASOURCE_URL",
@@ -26,17 +24,15 @@
         },
         {
           "name": "SPRING_DATASOURCE_USERNAME",
-          "value": "amigoscode"
+          "value": "postgres"
         }
       ],
-
       "secrets": [
         {
           "name": "SPRING_DATASOURCE_PASSWORD",
           "valueFrom": "arn:aws:ssm:us-east-1:080967118593:parameter/mlops-poc/dev/product-service/db_password"
         }
       ],
-
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
@@ -45,10 +41,13 @@
           "awslogs-stream-prefix": "ecs"
         }
       },
-
       "healthCheck": {
         "command": ["CMD-SHELL", "curl -f http://localhost:5050/actuator/health || exit 1"],
         "interval": 30,
         "timeout": 5,
-        "retries":
-
+        "retries": 3,
+        "startPeriod": 60
+      }
+    }
+  ]
+}
