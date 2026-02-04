@@ -25,6 +25,10 @@
         {
           "name": "SPRING_DATASOURCE_USERNAME",
           "value": "amigoscode"
+        },
+        {
+          "name": "APP_KAFKA_ENABLED",
+          "value": "false"
         }
       ],
       "secrets": [
@@ -42,7 +46,10 @@
         }
       },
       "healthCheck": {
-        "command": ["CMD-SHELL", "curl -f http://localhost:5050/actuator/health || exit 1"],
+        "command": [
+          "CMD-SHELL",
+          "curl -f http://localhost:5050/actuator/health || exit 1"
+        ],
         "interval": 30,
         "timeout": 5,
         "retries": 3,
