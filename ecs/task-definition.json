@@ -29,6 +29,10 @@
         {
           "name": "APP_KAFKA_ENABLED",
           "value": "false"
+        },
+        {
+          "name": "SPRING_KAFKA_LISTENER_AUTO_STARTUP",
+          "value": "false"
         }
       ],
       "secrets": [
@@ -46,10 +50,7 @@
         }
       },
       "healthCheck": {
-        "command": [
-          "CMD-SHELL",
-          "curl -f http://localhost:5050/actuator/health || exit 1"
-        ],
+        "command": ["CMD-SHELL", "curl -f http://localhost:5050/actuator/health || exit 1"],
         "interval": 30,
         "timeout": 5,
         "retries": 3,
