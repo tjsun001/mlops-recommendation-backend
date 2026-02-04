@@ -20,7 +20,8 @@ public class RecommendationsController {
     // Demo-safe fallback list (swap these with your real popular IDs if you want)
     private static final List<Integer> FALLBACK_POPULAR = List.of(1, 2, 3, 101, 102);
 
-    public RecommendationsController(@Value("${INFERENCE_BASE_URL}") String inferenceBaseUrl) {
+    public RecommendationsController(@Value("${INFERENCE_BASE_URL:}") String inferenceBaseUrl) {
+
         this.inferenceBaseUrl = inferenceBaseUrl;
     }
 
