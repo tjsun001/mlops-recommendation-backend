@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "app.kafka.enabled", havingValue = "true")
 public class OutboxEventConsumer {
 
     private final ObjectMapper objectMapper;
@@ -24,10 +26,8 @@ public class OutboxEventConsumer {
         String key = record.key();
         String value = record.value();
 
-        // Parse message
         OutboxEventMessage msg = objectMapper.readValue(value, OutboxEventMessage.class);
 
-        // Idempotency: if already processed, ack and return
         if (processedEventService.isAlreadyProcessed(msg.id())) {
             log.info("Skipping already-processed event id={} topic={} partition={} offset={}",
                     msg.id(), record.topic(), record.partition(), record.offset());
@@ -36,13 +36,9 @@ public class OutboxEventConsumer {
         }
 
         try {
-            // Do the "work"
             processedEventService.process(msg);
-
-            // Only ack AFTER successful processing
             ack.acknowledge();
         } catch (Exception e) {
-            // No ack => message will be re-delivered (at-least-once)
             log.error("Failed processing event id={} (will retry). topic={} partition={} offset={}",
                     msg.id(), record.topic(), record.partition(), record.offset(), e);
             throw e;
