@@ -26,10 +26,6 @@
           "name": "SPRING_DATASOURCE_USERNAME",
           "value": "amigoscode"
         },
-        {
-          "name": "SPRING_KAFKA_BOOTSTRAP_SERVERS",
-          "value": "<PUT_MSK_BOOTSTRAP_HERE>"
-        }
       ],
       "secrets": [
         {
