@@ -27,11 +27,11 @@
           "value": "amigoscode"
         },
         {
-          "name": "APP_KAFKA_ENABLED",
+          "name": "SPRING_KAFKA_LISTENER_AUTO_STARTUP",
           "value": "false"
         },
         {
-          "name": "SPRING_KAFKA_LISTENER_AUTO_STARTUP",
+          "name": "MANAGEMENT_HEALTH_KAFKA_ENABLED",
           "value": "false"
         }
       ],
