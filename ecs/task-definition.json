@@ -24,7 +24,7 @@
         },
         {
           "name": "SPRING_DATASOURCE_USERNAME",
-          "value": "postgres"
+          "value": "amigoscode"
         }
       ],
       "secrets": [
