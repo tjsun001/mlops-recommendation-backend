@@ -33,6 +33,14 @@
         {
           "name": "MANAGEMENT_HEALTH_KAFKA_ENABLED",
           "value": "false"
+        },
+        {
+          "name": "MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS",
+          "value": "always"
+        },
+        {
+          "name": "MANAGEMENT_ENDPOINT_HEALTH_SHOW_COMPONENTS",
+          "value": "always"
         }
       ],
       "secrets": [
