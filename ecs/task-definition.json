@@ -28,7 +28,7 @@
         },
         {
           "name": "SPRING_KAFKA_LISTENER_AUTO_STARTUP",
-          "value": "false"
+          "value": "true"
         },
         {
           "name": "MANAGEMENT_HEALTH_KAFKA_ENABLED",
