@@ -41,6 +41,10 @@
         {
           "name": "MANAGEMENT_ENDPOINT_HEALTH_SHOW_COMPONENTS",
           "value": "always"
+        },
+        {
+          "name": "SPRING_PROFILES_ACTIVE",
+          "value": "aws"
         }
       ],
       "secrets": [
