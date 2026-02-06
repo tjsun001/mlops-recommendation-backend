@@ -9,7 +9,7 @@
   "containerDefinitions": [
     {
       "name": "product-service",
-      "image": "REPLACE_ME_IMAGE",
+      "image": "080967118593.dkr.ecr.us-east-1.amazonaws.com/product-service:20260204205509",
       "essential": true,
       "portMappings": [
         {
