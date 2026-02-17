@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "app.kafka.enabled", havingValue = "true")
+
 public class OutboxEventConsumer {
 
     private final ObjectMapper objectMapper;
