@@ -101,12 +101,14 @@ jobs:
           echo "IMAGE_URI=$IMAGE_URI" >> "$GITHUB_ENV"
           echo "Using existing image: $IMAGE_URI"
 
-      # Otherwise build a new image with a timestamp tag and push it.
-      - name: Resolve image tag
+      # Otherwise build a new image with a SHA tag and push it.
+      - name: Resolve image tag (use commit SHA)
         if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.image_tag != '') }}
         run: |
-          TAG="$(date +'%Y%m%d%H%M%S')"
+          SHORT_SHA="${GITHUB_SHA::7}"
+          TAG="sha-${SHORT_SHA}"
           echo "IMAGE_TAG=$TAG" >> "$GITHUB_ENV"
+          echo "Using IMAGE_TAG=$TAG"
 
       - name: Build and push image to ECR
         if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.image_tag != '') }}
