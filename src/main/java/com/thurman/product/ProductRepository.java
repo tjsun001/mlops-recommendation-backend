@@ -6,7 +6,6 @@ import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
 import java.util.UUID;
-@ConditionalOnProperty(name = "app.kafka.enabled", havingValue = "true")
 public interface ProductRepository
         extends JpaRepository<Product, UUID> {
 
