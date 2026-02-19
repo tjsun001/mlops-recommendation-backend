@@ -1,0 +1,93 @@
+{
+  "containerDefinitions": [
+    {
+      "name": "product-service",
+      "image": "080967118593.dkr.ecr.us-east-1.amazonaws.com/product-service:no-db-amd64-20260218-211815",
+      "cpu": 0,
+      "portMappings": [
+        {
+          "containerPort": 5050,
+          "hostPort": 5050,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": true,
+      "environment": [
+        {
+          "name": "SPRING_KAFKA_LISTENER_AUTO_STARTUP",
+          "value": "true"
+        },
+        {
+          "name": "MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS",
+          "value": "always"
+        },
+        {
+          "name": "SPRING_DATASOURCE_URL",
+          "value": "jdbc:postgresql://mlops-poc-dev-postgres.cepc6knnxbcb.us-east-1.rds.amazonaws.com:5432/jfs"
+        },
+        {
+          "name": "SPRING_PROFILES_ACTIVE",
+          "value": "aws"
+        },
+        {
+          "name": "SPRING_DATASOURCE_USERNAME",
+          "value": "amigoscode"
+        },
+        {
+          "name": "MANAGEMENT_HEALTH_KAFKA_ENABLED",
+          "value": "false"
+        },
+        {
+          "name": "MANAGEMENT_ENDPOINT_HEALTH_SHOW_COMPONENTS",
+          "value": "always"
+        },
+        {
+          "name": "DEBUG",
+          "value": "true"
+        },
+        {
+          "name": "LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_BOOT_AUTOCONFIGURE",
+          "value": "DEBUG"
+        }
+      ],
+      "mountPoints": [],
+      "volumesFrom": [],
+      "secrets": [
+        {
+          "name": "SPRING_DATASOURCE_PASSWORD",
+          "valueFrom": "arn:aws:ssm:us-east-1:080967118593:parameter/mlops-poc/dev/postgres/password"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/mlops-poc-dev-product-service",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "curl -f http://localhost:5050/actuator/health || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      },
+      "systemControls": []
+    }
+  ],
+  "family": "mlops-poc-dev-product-service",
+  "taskRoleArn": "arn:aws:iam::080967118593:role/mlops-poc-dev-ecs-task-role",
+  "executionRoleArn": "arn:aws:iam::080967118593:role/mlops-poc-dev-ecs-task-exec-role",
+  "networkMode": "awsvpc",
+  "volumes": [],
+  "placementConstraints": [],
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "512",
+  "memory": "1024"
+}
