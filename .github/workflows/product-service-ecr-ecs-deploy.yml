@@ -114,7 +114,9 @@ jobs:
       # workflow_dispatch + image_tag => deploy that existing tag (no build)
       - name: Set IMAGE_URI from input tag (skip build)
         if: env.SKIP_BUILD == 'true'
+        shell: bash
         run: |
+          set -euo pipefail
           ECR_REGISTRY="${{ steps.login-ecr.outputs.registry }}"
           IMAGE_URI="$ECR_REGISTRY/${{ env.ECR_REPO }}:${{ inputs.image_tag }}"
           echo "IMAGE_URI=$IMAGE_URI" >> "$GITHUB_ENV"
@@ -123,14 +125,18 @@ jobs:
       # push (or dispatch without image_tag) => build with immutable tag
       - name: Resolve image tag (immutable SHA)
         if: env.SKIP_BUILD == 'false'
+        shell: bash
         run: |
+          set -euo pipefail
           TAG="sha-${GITHUB_SHA}"
           echo "IMAGE_TAG=$TAG" >> "$GITHUB_ENV"
           echo "Using IMAGE_TAG=$TAG"
 
       - name: Build and push image to ECR (Jib)
         if: env.SKIP_BUILD == 'false'
+        shell: bash
         run: |
+          set -euo pipefail
           ECR_REGISTRY="${{ steps.login-ecr.outputs.registry }}"
           IMAGE_URI="$ECR_REGISTRY/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}"
           mvn -B -ntp -DskipTests clean package jib:build -Dimage="$IMAGE_URI"
@@ -145,10 +151,84 @@ jobs:
           container-name: ${{ env.CONTAINER_NAME }}
           image: ${{ env.IMAGE_URI }}
 
+      # -----------------------------
+      # OPTION A: HARD GATE #1
+      # Verify rendered task-def image EXACTLY matches IMAGE_URI
+      # -----------------------------
+      - name: Verify rendered task definition image matches IMAGE_URI (hard gate)
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXPECTED="${IMAGE_URI}"
+
+          # The render action outputs a local file path to the rendered task definition JSON
+          RENDERED="${{ steps.render-td.outputs.task-definition }}"
+          echo "Rendered task definition: $RENDERED"
+
+          ACTUAL="$(jq -r --arg NAME "${{ env.CONTAINER_NAME }}" '
+            .containerDefinitions[] | select(.name == $NAME) | .image
+          ' "$RENDERED")"
+
+          echo "EXPECTED=$EXPECTED"
+          echo "ACTUAL=$ACTUAL"
+
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "ERROR: Rendered task definition image mismatch. Aborting."
+            exit 1
+          fi
+
       - name: Deploy to ECS
+        id: deploy
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
           task-definition: ${{ steps.render-td.outputs.task-definition }}
           cluster: ${{ env.ECS_CLUSTER }}
           service: ${{ env.ECS_SERVICE }}
           wait-for-service-stability: true
+
+      # -----------------------------
+      # OPTION A: HARD GATE #2
+      # Verify service is actually running the new task definition
+      # -----------------------------
+      - name: Wait for ECS service stable (extra certainty)
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws ecs wait services-stable \
+            --region "${{ env.AWS_REGION }}" \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --services "${{ env.ECS_SERVICE }}"
+
+      - name: Verify ECS service is running the expected task definition + image (hard gate)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          EXPECTED_IMAGE="${IMAGE_URI}"
+
+          # Find what task definition the service thinks it's on
+          SERVICE_TD="$(aws ecs describe-services \
+            --region "${{ env.AWS_REGION }}" \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --services "${{ env.ECS_SERVICE }}" \
+            --query "services[0].taskDefinition" \
+            --output text)"
+
+          echo "Service task definition: $SERVICE_TD"
+
+          # Confirm the image inside that task definition matches what we intended to deploy
+          ACTUAL_IMAGE="$(aws ecs describe-task-definition \
+            --region "${{ env.AWS_REGION }}" \
+            --task-definition "$SERVICE_TD" \
+            --query "taskDefinition.containerDefinitions[?name=='${{ env.CONTAINER_NAME }}'].image | [0]" \
+            --output text)"
+
+          echo "EXPECTED_IMAGE=$EXPECTED_IMAGE"
+          echo "ACTUAL_IMAGE=$ACTUAL_IMAGE"
+
+          if [ "$ACTUAL_IMAGE" != "$EXPECTED_IMAGE" ]; then
+            echo "ERROR: ECS service is not running the expected image. Aborting."
+            exit 1
+          fi
+
+          echo "✅ Verified: ECS service is running the expected task definition and image."
