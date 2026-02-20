@@ -34,60 +34,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Debug run context
-        run: |
-          echo "SHA=$GITHUB_SHA"
-          echo "REF=$GITHUB_REF"
-          echo "EVENT=$GITHUB_EVENT_NAME"
-
-      - name: Debug OIDC inputs (safe)
-        env:
-          ROLE_ARN: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-        run: |
-          if [ -n "${ROLE_ARN:-}" ]; then
-            echo "ROLE_SET=yes"
-          else
-            echo "ROLE_SET=no"
-          fi
-          echo "NOTE: IAM trust policy is main-only in your setup; REF must be refs/heads/main."
-
       - name: Assert running on main
         run: |
           if [ "$GITHUB_REF" != "refs/heads/main" ]; then
-            echo "This workflow must run on refs/heads/main due to IAM trust policy. Current: $GITHUB_REF"
+            echo "Must run on main branch"
             exit 1
           fi
 
-      - name: List repo + ecs folder
-        run: |
-          ls -la
-          ls -la ecs || true
-
       - name: Ensure task definition exists
         run: |
-          test -f "${{ env.TASK_DEFINITION_FILE }}" || (echo "Missing ${{ env.TASK_DEFINITION_FILE }}" && exit 1)
+          test -f "${{ env.TASK_DEFINITION_FILE }}" || exit 1
 
-      - name: Guardrail: ensure required env vars exist in task definition template
-        run: |
-          echo "Validating required env vars in ${{ env.TASK_DEFINITION_FILE }} ..."
-          jq -e '.containerDefinitions[0].environment | map(.name) | index("SPRING_DATASOURCE_URL")' "${{ env.TASK_DEFINITION_FILE }}" >/dev/null
-          jq -e '.containerDefinitions[0].environment | map(.name) | index("SPRING_DATASOURCE_USERNAME")' "${{ env.TASK_DEFINITION_FILE }}" >/dev/null
-          jq -e '.containerDefinitions[0].environment | map(.name) | index("SPRING_DATASOURCE_PASSWORD")' "${{ env.TASK_DEFINITION_FILE }}" >/dev/null
-          jq -e '.containerDefinitions[0].environment | map(.name) | index("INFERENCE_BASE_URL")' "${{ env.TASK_DEFINITION_FILE }}" >/dev/null
-          echo "OK: task definition template contains required env vars."
-
-      # Decide once: are we skipping the build?
       - name: Resolve build mode
         id: mode
         run: |
           if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ -n "${{ inputs.image_tag }}" ]; then
-            echo "SKIP_BUILD=true" >> "$GITHUB_ENV"
-            echo "MODE=deploy-existing" >> "$GITHUB_OUTPUT"
+            echo "SKIP_BUILD=true" >> $GITHUB_ENV
           else
-            echo "SKIP_BUILD=false" >> "$GITHUB_ENV"
-            echo "MODE=build-and-deploy" >> "$GITHUB_OUTPUT"
+            echo "SKIP_BUILD=false" >> $GITHUB_ENV
           fi
-          echo "MODE=${{ steps.mode.outputs.MODE }}"
 
       - name: Setup Java
         if: env.SKIP_BUILD == 'false'
@@ -95,140 +60,90 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-          cache: maven
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
-          role-session-name: gha-product-service
-
-      - name: Verify AWS identity
-        run: aws sts get-caller-identity
 
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # workflow_dispatch + image_tag => deploy that existing tag (no build)
-      - name: Set IMAGE_URI from input tag (skip build)
+      - name: Set IMAGE_URI from existing tag
         if: env.SKIP_BUILD == 'true'
-        shell: bash
         run: |
-          set -euo pipefail
-          ECR_REGISTRY="${{ steps.login-ecr.outputs.registry }}"
-          IMAGE_URI="$ECR_REGISTRY/${{ env.ECR_REPO }}:${{ inputs.image_tag }}"
-          echo "IMAGE_URI=$IMAGE_URI" >> "$GITHUB_ENV"
-          echo "Using existing image: $IMAGE_URI"
+          REGISTRY="${{ steps.login-ecr.outputs.registry }}"
+          IMAGE_URI="$REGISTRY/${{ env.ECR_REPO }}:${{ inputs.image_tag }}"
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
 
-      # push (or dispatch without image_tag) => build with immutable tag
-      - name: Resolve image tag (immutable SHA)
+      - name: Build and push image
         if: env.SKIP_BUILD == 'false'
-        shell: bash
         run: |
-          set -euo pipefail
-          TAG="sha-${GITHUB_SHA}"
-          echo "IMAGE_TAG=$TAG" >> "$GITHUB_ENV"
-          echo "Using IMAGE_TAG=$TAG"
+          REGISTRY="${{ steps.login-ecr.outputs.registry }}"
+          IMAGE_TAG="sha-${GITHUB_SHA}"
+          IMAGE_URI="$REGISTRY/${{ env.ECR_REPO }}:$IMAGE_TAG"
 
-      - name: Build and push image to ECR (Jib)
-        if: env.SKIP_BUILD == 'false'
-        shell: bash
-        run: |
-          set -euo pipefail
-          ECR_REGISTRY="${{ steps.login-ecr.outputs.registry }}"
-          IMAGE_URI="$ECR_REGISTRY/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}"
-          mvn -B -ntp -DskipTests clean package jib:build -Dimage="$IMAGE_URI"
-          echo "IMAGE_URI=$IMAGE_URI" >> "$GITHUB_ENV"
-          echo "Built and pushed: $IMAGE_URI"
+          mvn -B -ntp -DskipTests clean package jib:build \
+            -Dimage="$IMAGE_URI"
+
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
 
       - name: Render ECS task definition
-        id: render-td
+        id: render
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: ${{ env.TASK_DEFINITION_FILE }}
           container-name: ${{ env.CONTAINER_NAME }}
           image: ${{ env.IMAGE_URI }}
 
-      # -----------------------------
-      # OPTION A: HARD GATE #1
-      # Verify rendered task-def image EXACTLY matches IMAGE_URI
-      # -----------------------------
-      - name: Verify rendered task definition image matches IMAGE_URI (hard gate)
-        shell: bash
+      # HARD GATE #1
+      - name: Verify rendered task definition image
         run: |
-          set -euo pipefail
-          EXPECTED="${IMAGE_URI}"
+          EXPECTED="${{ env.IMAGE_URI }}"
+          FILE="${{ steps.render.outputs.task-definition }}"
 
-          # The render action outputs a local file path to the rendered task definition JSON
-          RENDERED="${{ steps.render-td.outputs.task-definition }}"
-          echo "Rendered task definition: $RENDERED"
-
-          ACTUAL="$(jq -r --arg NAME "${{ env.CONTAINER_NAME }}" '
-            .containerDefinitions[] | select(.name == $NAME) | .image
-          ' "$RENDERED")"
+          ACTUAL=$(jq -r '.containerDefinitions[0].image' "$FILE")
 
           echo "EXPECTED=$EXPECTED"
           echo "ACTUAL=$ACTUAL"
 
-          if [ "$ACTUAL" != "$EXPECTED" ]; then
-            echo "ERROR: Rendered task definition image mismatch. Aborting."
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "Image mismatch"
             exit 1
           fi
 
-      - name: Deploy to ECS
-        id: deploy
+      - name: Deploy ECS service
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
-          task-definition: ${{ steps.render-td.outputs.task-definition }}
+          task-definition: ${{ steps.render.outputs.task-definition }}
           cluster: ${{ env.ECS_CLUSTER }}
           service: ${{ env.ECS_SERVICE }}
           wait-for-service-stability: true
 
-      # -----------------------------
-      # OPTION A: HARD GATE #2
-      # Verify service is actually running the new task definition
-      # -----------------------------
-      - name: Wait for ECS service stable (extra certainty)
-        shell: bash
+      # HARD GATE #2
+      - name: Verify ECS service image
         run: |
-          set -euo pipefail
-          aws ecs wait services-stable \
-            --region "${{ env.AWS_REGION }}" \
-            --cluster "${{ env.ECS_CLUSTER }}" \
-            --services "${{ env.ECS_SERVICE }}"
+          EXPECTED="${{ env.IMAGE_URI }}"
 
-      - name: Verify ECS service is running the expected task definition + image (hard gate)
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          EXPECTED_IMAGE="${IMAGE_URI}"
-
-          # Find what task definition the service thinks it's on
-          SERVICE_TD="$(aws ecs describe-services \
-            --region "${{ env.AWS_REGION }}" \
+          TD=$(aws ecs describe-services \
             --cluster "${{ env.ECS_CLUSTER }}" \
             --services "${{ env.ECS_SERVICE }}" \
             --query "services[0].taskDefinition" \
-            --output text)"
+            --output text)
 
-          echo "Service task definition: $SERVICE_TD"
+          ACTUAL=$(aws ecs describe-task-definition \
+            --task-definition "$TD" \
+            --query "taskDefinition.containerDefinitions[0].image" \
+            --output text)
 
-          # Confirm the image inside that task definition matches what we intended to deploy
-          ACTUAL_IMAGE="$(aws ecs describe-task-definition \
-            --region "${{ env.AWS_REGION }}" \
-            --task-definition "$SERVICE_TD" \
-            --query "taskDefinition.containerDefinitions[?name=='${{ env.CONTAINER_NAME }}'].image | [0]" \
-            --output text)"
+          echo "EXPECTED=$EXPECTED"
+          echo "ACTUAL=$ACTUAL"
 
-          echo "EXPECTED_IMAGE=$EXPECTED_IMAGE"
-          echo "ACTUAL_IMAGE=$ACTUAL_IMAGE"
-
-          if [ "$ACTUAL_IMAGE" != "$EXPECTED_IMAGE" ]; then
-            echo "ERROR: ECS service is not running the expected image. Aborting."
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "Service running wrong image"
             exit 1
           fi
 
-          echo "✅ Verified: ECS service is running the expected task definition and image."
+          echo "Deployment verified successfully"
