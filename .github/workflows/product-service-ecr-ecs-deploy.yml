@@ -40,7 +40,6 @@ jobs:
           echo "REF=$GITHUB_REF"
           echo "EVENT=$GITHUB_EVENT_NAME"
 
-      # ✅ Safe debug step (no fragile bash conditional with masked secrets)
       - name: Debug OIDC inputs (safe)
         env:
           ROLE_ARN: ${{ secrets.AWS_ROLE_TO_ASSUME }}
@@ -52,7 +51,6 @@ jobs:
           fi
           echo "NOTE: IAM trust policy is main-only in your setup; REF must be refs/heads/main."
 
-      # ✅ Guardrail: fail fast if not running on main (matches your IAM trust policy)
       - name: Assert running on main
         run: |
           if [ "$GITHUB_REF" != "refs/heads/main" ]; then
@@ -60,7 +58,6 @@ jobs:
             exit 1
           fi
 
-      # ✅ Debug: show repo + ecs folder contents (helps diagnose missing task definition)
       - name: List repo + ecs folder
         run: |
           ls -la
@@ -70,8 +67,21 @@ jobs:
         run: |
           test -f "${{ env.TASK_DEFINITION_FILE }}" || (echo "Missing ${{ env.TASK_DEFINITION_FILE }}" && exit 1)
 
+      # Decide once: are we skipping the build?
+      - name: Resolve build mode
+        id: mode
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ -n "${{ inputs.image_tag }}" ]; then
+            echo "SKIP_BUILD=true" >> "$GITHUB_ENV"
+            echo "MODE=deploy-existing" >> "$GITHUB_OUTPUT"
+          else
+            echo "SKIP_BUILD=false" >> "$GITHUB_ENV"
+            echo "MODE=build-and-deploy" >> "$GITHUB_OUTPUT"
+          fi
+          echo "MODE=${{ steps.mode.outputs.MODE }}"
+
       - name: Setup Java
-        if: ${{ github.event_name == 'push' || inputs.image_tag == '' }}
+        if: env.SKIP_BUILD == 'false'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -92,26 +102,25 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # If an image_tag is provided manually, deploy that existing image tag (no build).
+      # workflow_dispatch + image_tag => deploy that existing tag (no build)
       - name: Set IMAGE_URI from input tag (skip build)
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.image_tag != '' }}
+        if: env.SKIP_BUILD == 'true'
         run: |
           ECR_REGISTRY="${{ steps.login-ecr.outputs.registry }}"
           IMAGE_URI="$ECR_REGISTRY/${{ env.ECR_REPO }}:${{ inputs.image_tag }}"
           echo "IMAGE_URI=$IMAGE_URI" >> "$GITHUB_ENV"
           echo "Using existing image: $IMAGE_URI"
 
-      # Otherwise build a new image with a SHA tag and push it.
-      - name: Resolve image tag (use commit SHA)
-        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.image_tag != '') }}
+      # push (or dispatch without image_tag) => build with immutable tag
+      - name: Resolve image tag (immutable SHA)
+        if: env.SKIP_BUILD == 'false'
         run: |
-          SHORT_SHA="${GITHUB_SHA::7}"
-          TAG="sha-${SHORT_SHA}"
+          TAG="sha-${GITHUB_SHA}"
           echo "IMAGE_TAG=$TAG" >> "$GITHUB_ENV"
           echo "Using IMAGE_TAG=$TAG"
 
-      - name: Build and push image to ECR
-        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.image_tag != '') }}
+      - name: Build and push image to ECR (Jib)
+        if: env.SKIP_BUILD == 'false'
         run: |
           ECR_REGISTRY="${{ steps.login-ecr.outputs.registry }}"
           IMAGE_URI="$ECR_REGISTRY/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}"
