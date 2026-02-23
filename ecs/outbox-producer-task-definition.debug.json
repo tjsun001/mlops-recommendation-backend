@@ -28,7 +28,7 @@
         },
         {
           "name": "SPRING_KAFKA_BOOTSTRAP_SERVERS",
-          "value": "boot-6agurcio.c1.kafka-serverless.us-east-1.amazonaws.com:9098"
+          "value": "boot-zhc6nb6s.c2.kafka-serverless.us-east-1.amazonaws.com:9098"
         },
         {
           "name": "SPRING_DATASOURCE_URL",
