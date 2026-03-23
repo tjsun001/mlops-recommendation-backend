@@ -1,0 +1,106 @@
+{
+    "taskDefinitionArn": "arn:aws:ecs:us-east-1:080967118593:task-definition/outbox-consumer-service:11",
+    "containerDefinitions": [
+        {
+            "name": "outbox-consumer-service",
+            "image": "080967118593.dkr.ecr.us-east-1.amazonaws.com/outbox-consumer-service@sha256:e8951b27cad131c729f3870b8ea4c68f96daba14cdd5d232dfa6a996a3985950",
+            "cpu": 0,
+            "portMappings": [
+                {
+                    "containerPort": 80,
+                    "hostPort": 80,
+                    "protocol": "tcp",
+                    "name": "outbox-consumer-service-80-tcp",
+                    "appProtocol": "http"
+                }
+            ],
+            "essential": true,
+            "environment": [
+                {
+                    "name": "APP_TOPIC",
+                    "value": "outbox.events.test"
+                },
+                {
+                    "name": "SPRING_KAFKA_BOOTSTRAP_SERVERS",
+                    "value": "boot-6agurcio.c1.kafka-serverless.us-east-1.amazonaws.com:9098"
+                },
+                {
+                    "name": "SPRING_PROFILES_ACTIVE",
+                    "value": "aws"
+                }
+            ],
+            "environmentFiles": [],
+            "mountPoints": [],
+            "volumesFrom": [],
+            "ulimits": [],
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/outbox-consumer-service",
+                    "awslogs-create-group": "true",
+                    "awslogs-region": "us-east-1",
+                    "awslogs-stream-prefix": "ecs"
+                },
+                "secretOptions": []
+            },
+            "systemControls": []
+        }
+    ],
+    "family": "outbox-consumer-service",
+    "taskRoleArn": "arn:aws:iam::080967118593:role/ecs-inference-task-role",
+    "executionRoleArn": "arn:aws:iam::080967118593:role/ecsTaskExecutionRole",
+    "networkMode": "awsvpc",
+    "revision": 11,
+    "volumes": [],
+    "status": "ACTIVE",
+    "requiresAttributes": [
+        {
+            "name": "com.amazonaws.ecs.capability.logging-driver.awslogs"
+        },
+        {
+            "name": "ecs.capability.execution-role-awslogs"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.ecr-auth"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.19"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.21"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.task-iam-role"
+        },
+        {
+            "name": "ecs.capability.execution-role-ecr-pull"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.18"
+        },
+        {
+            "name": "ecs.capability.task-eni"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.29"
+        }
+    ],
+    "placementConstraints": [],
+    "compatibilities": [
+        "EC2",
+        "MANAGED_INSTANCES",
+        "FARGATE"
+    ],
+    "runtimePlatform": {
+        "cpuArchitecture": "X86_64",
+        "operatingSystemFamily": "LINUX"
+    },
+    "requiresCompatibilities": [
+        "FARGATE"
+    ],
+    "cpu": "1024",
+    "memory": "3072",
+    "registeredAt": "2026-01-20T16:07:27.256000-05:00",
+    "registeredBy": "arn:aws:iam::080967118593:root",
+    "enableFaultInjection": false
+}
