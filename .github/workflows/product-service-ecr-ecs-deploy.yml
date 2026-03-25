@@ -25,6 +25,7 @@ env:
   ECS_SERVICE: mlops-poc-dev-product-service
   CONTAINER_NAME: product-service
   TASK_DEFINITION_FILE: ecs/task-definition.json
+  JWT_EXPIRATION: "86400000"
 
 jobs:
   build-and-deploy:
@@ -45,13 +46,17 @@ jobs:
         run: |
           test -f "${{ env.TASK_DEFINITION_FILE }}" || exit 1
 
+      - name: Ensure required secrets exist
+        run: |
+          test -n "${{ secrets.AWS_ROLE_TO_ASSUME }}" || { echo "Missing AWS_ROLE_TO_ASSUME"; exit 1; }
+          test -n "${{ secrets.JWT_SECRET }}" || { echo "Missing JWT_SECRET"; exit 1; }
+
       - name: Resolve build mode
-        id: mode
         run: |
           if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ -n "${{ inputs.image_tag }}" ]; then
-            echo "SKIP_BUILD=true" >> $GITHUB_ENV
+            echo "SKIP_BUILD=true" >> "$GITHUB_ENV"
           else
-            echo "SKIP_BUILD=false" >> $GITHUB_ENV
+            echo "SKIP_BUILD=false" >> "$GITHUB_ENV"
           fi
 
       - name: Setup Java
@@ -76,7 +81,7 @@ jobs:
         run: |
           REGISTRY="${{ steps.login-ecr.outputs.registry }}"
           IMAGE_URI="$REGISTRY/${{ env.ECR_REPO }}:${{ inputs.image_tag }}"
-          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+          echo "IMAGE_URI=$IMAGE_URI" >> "$GITHUB_ENV"
 
       - name: Build and push image
         if: env.SKIP_BUILD == 'false'
@@ -88,36 +93,67 @@ jobs:
           mvn -B -ntp -DskipTests clean package jib:build \
             -Dimage="$IMAGE_URI"
 
-          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+          echo "IMAGE_URI=$IMAGE_URI" >> "$GITHUB_ENV"
 
-      - name: Render ECS task definition
-        id: render
+      - name: Render ECS task definition with image
+        id: render-image
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: ${{ env.TASK_DEFINITION_FILE }}
           container-name: ${{ env.CONTAINER_NAME }}
           image: ${{ env.IMAGE_URI }}
 
+      - name: Render ECS task definition with JWT env vars
+        id: render-env
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ steps.render-image.outputs.task-definition }}
+          container-name: ${{ env.CONTAINER_NAME }}
+          environment-variables: |
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            JWT_EXPIRATION=${{ env.JWT_EXPIRATION }}
+            SPRING_PROFILES_ACTIVE=aws
+
       # HARD GATE #1
-      - name: Verify rendered task definition image
+      - name: Verify rendered task definition image and JWT env vars
         run: |
-          EXPECTED="${{ env.IMAGE_URI }}"
-          FILE="${{ steps.render.outputs.task-definition }}"
+          EXPECTED_IMAGE="${{ env.IMAGE_URI }}"
+          FILE="${{ steps.render-env.outputs.task-definition }}"
 
-          ACTUAL=$(jq -r '.containerDefinitions[0].image' "$FILE")
+          ACTUAL_IMAGE=$(jq -r '.containerDefinitions[0].image' "$FILE")
+          JWT_SECRET_PRESENT=$(jq -r '.containerDefinitions[0].environment[] | select(.name=="JWT_SECRET") | .value' "$FILE")
+          JWT_EXPIRATION_PRESENT=$(jq -r '.containerDefinitions[0].environment[] | select(.name=="JWT_EXPIRATION") | .value' "$FILE")
+          PROFILE_PRESENT=$(jq -r '.containerDefinitions[0].environment[] | select(.name=="SPRING_PROFILES_ACTIVE") | .value' "$FILE")
 
-          echo "EXPECTED=$EXPECTED"
-          echo "ACTUAL=$ACTUAL"
+          echo "EXPECTED_IMAGE=$EXPECTED_IMAGE"
+          echo "ACTUAL_IMAGE=$ACTUAL_IMAGE"
+          echo "JWT_EXPIRATION=$JWT_EXPIRATION_PRESENT"
+          echo "SPRING_PROFILES_ACTIVE=$PROFILE_PRESENT"
 
-          if [ "$EXPECTED" != "$ACTUAL" ]; then
+          if [ "$EXPECTED_IMAGE" != "$ACTUAL_IMAGE" ]; then
             echo "Image mismatch"
+            exit 1
+          fi
+
+          if [ -z "$JWT_SECRET_PRESENT" ] || [ "$JWT_SECRET_PRESENT" = "null" ]; then
+            echo "JWT_SECRET missing from rendered task definition"
+            exit 1
+          fi
+
+          if [ "$JWT_EXPIRATION_PRESENT" != "${{ env.JWT_EXPIRATION }}" ]; then
+            echo "JWT_EXPIRATION mismatch"
+            exit 1
+          fi
+
+          if [ "$PROFILE_PRESENT" != "aws" ]; then
+            echo "SPRING_PROFILES_ACTIVE mismatch"
             exit 1
           fi
 
       - name: Deploy ECS service
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
-          task-definition: ${{ steps.render.outputs.task-definition }}
+          task-definition: ${{ steps.render-env.outputs.task-definition }}
           cluster: ${{ env.ECS_CLUSTER }}
           service: ${{ env.ECS_SERVICE }}
           wait-for-service-stability: true
