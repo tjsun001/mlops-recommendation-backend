@@ -2,7 +2,7 @@
   "containerDefinitions": [
     {
       "name": "product-service",
-      "image": "080967118593.dkr.ecr.us-east-1.amazonaws.com/product-service:sha-3d699d3",
+      "image": "080967118593.dkr.ecr.us-east-1.amazonaws.com/product-service:placeholder",
       "cpu": 0,
       "portMappings": [
         {
@@ -32,10 +32,6 @@
         {
           "name": "SPRING_DATASOURCE_PASSWORD",
           "value": "password"
-        },
-        {
-          "name": "SPRING_PROFILES_ACTIVE",
-          "value": "aws"
         },
         {
           "name": "SPRING_DATASOURCE_USERNAME",
