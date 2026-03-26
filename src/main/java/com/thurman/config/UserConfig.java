@@ -14,7 +14,7 @@ public class UserConfig {
     @Bean
     public InMemoryUserDetailsManager userDetailsService(PasswordEncoder passwordEncoder) {
         UserDetails user = User.builder()
-                .username("demo")
+                .username("demo@example.com")  // ✅ use email as username
                 .password(passwordEncoder.encode("demo123"))
                 .roles("USER")
                 .build();
